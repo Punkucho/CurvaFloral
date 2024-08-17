@@ -1,23 +1,24 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import ttk, filedialog, messagebox
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
-from scipy.interpolate import make_interp_spline
+import json
 from random import randint
 import numpy as np
-import os
+from scipy.interpolate import make_interp_spline
 
-# Diccionario para almacenar los datos de avistamientos y colores
-avistamientos = {mes: [0, 0] for mes in range(12)}  # Cada mes tiene dos quincenas y cuenta de plantas
+# Datos iniciales
+def inicializar_avistamientos():
+    return {mes: [0, 0] for mes in range(12)}
+
+avistamientos = inicializar_avistamientos()
 colores = {}
 plantas_avistadas = {}
 
-# Función para generar un color aleatorio en formato hexadecimal
 def generar_color():
     return "#{:06x}".format(randint(0, 0xFFFFFF))
 
-# Función para agregar datos y mostrar un mensaje de confirmación
 def agregar_avistamiento():
     planta = planta_entry.get()
     nombre_cientifico = nombre_cientifico_entry.get()
@@ -32,9 +33,9 @@ def agregar_avistamiento():
     for mes in range(12):
         if quincenas[mes][0].get() == 1 or quincenas[mes][1].get() == 1:
             if planta not in plantas_avistadas:
-                plantas_avistadas[planta] = {'nombre_cientifico': nombre_cientifico, 'meses': []}
-            if mes not in plantas_avistadas[planta]['meses']:
-                plantas_avistadas[planta]['meses'].append(mes)
+                plantas_avistadas[planta] = {"nombre_cientifico": nombre_cientifico, "meses": []}
+            if mes not in plantas_avistadas[planta]["meses"]:
+                plantas_avistadas[planta]["meses"].append(mes)
                 meses_avistados.append(mes)
             if quincenas[mes][0].get() == 1:
                 avistamientos[mes][0] += 1
@@ -51,116 +52,154 @@ def agregar_avistamiento():
         quincenas[mes][0].set(0)
         quincenas[mes][1].set(0)
 
-# Función para actualizar la lista de plantas avistadas
 def actualizar_lista_plantas():
     lista_plantas.delete(0, tk.END)
     for planta, datos in plantas_avistadas.items():
-        meses_texto = ", ".join(meses[mes] for mes in datos['meses'])
-        lista_plantas.insert(tk.END, f"{planta} (Nombre Científico: {datos['nombre_cientifico']}, Meses: {meses_texto})")
+        meses_texto = ", ".join(meses_nombres[mes] for mes in datos["meses"])
+        lista_plantas.insert(tk.END, f"{planta} ({datos['nombre_cientifico']}) - Meses: {meses_texto}")
         lista_plantas.itemconfig(tk.END, {'fg': colores[planta]})
 
-# Función para crear y mostrar el gráfico en una nueva ventana
 def mostrar_grafico():
     meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
     
-    # Crear la nueva ventana para el gráfico
     grafico_ventana = tk.Toplevel(root)
     grafico_ventana.title("Generador de curva floral")
-
-    # Frame para contener el gráfico y el scrollbar
+    
     grafico_frame = ttk.Frame(grafico_ventana)
     grafico_frame.pack(fill=tk.BOTH, expand=True)
-
-    # Crear un scrollbar vertical y horizontal
+    
     scrollbar_y = tk.Scrollbar(grafico_frame, orient=tk.VERTICAL)
     scrollbar_x = tk.Scrollbar(grafico_frame, orient=tk.HORIZONTAL)
 
-    # Crear un canvas donde se colocará el gráfico
     grafico_canvas = tk.Canvas(grafico_frame, scrollregion=(0, 0, 800, 600),
                                yscrollcommand=scrollbar_y.set, xscrollcommand=scrollbar_x.set)
     scrollbar_y.config(command=grafico_canvas.yview)
     scrollbar_x.config(command=grafico_canvas.xview)
 
-    # Empaquetar scrollbars y canvas
     scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
     scrollbar_x.pack(side=tk.BOTTOM, fill=tk.X)
     grafico_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
     fig = Figure(figsize=(10, 6))
     ax = fig.add_subplot(111)
-    ax.set_title("Generador de curva floral", fontsize=14, fontweight='bold', color='purple')
-    ax.set_xlabel('Meses', fontsize=12)
-    ax.set_ylabel('Cantidad de Plantas', fontsize=12)
+    ax.set_title("Generador de curva floral")
+    ax.set_xlabel('Meses')
+    ax.set_ylabel('Cantidad de Plantas')
 
-    # Preparar los datos para la curva
-    x = list(range(12))
-    y1 = [avistamientos[mes][0] for mes in range(12)]
-    y2 = [avistamientos[mes][1] for mes in range(12)]
-
-    ax.plot(x, y1, 'o-', color='blue', label='1ra Quincena', alpha=0.7)
-    ax.plot(x, y2, 'o-', color='red', label='2da Quincena', alpha=0.7)
+    # Convertir las claves del diccionario a enteros
+    avistamientos_int_keys = {int(k): v for k, v in avistamientos.items()}
     
-    # Ajustar la curva si hay dispersión
-    if len(set(y1)) > 1:
-        spline1 = make_interp_spline(x, y1, k=2)
-        x_smooth = np.linspace(min(x), max(x), 500)
-        y_smooth1 = spline1(x_smooth)
-        ax.plot(x_smooth, y_smooth1, color='blue', alpha=0.5)
+    try:
+        conteos = [sum(avistamientos_int_keys[mes]) for mes in range(12)]
+    except KeyError as e:
+        print(f"Error: Clave {e} no encontrada en avistamientos.")
+        return
 
-    if len(set(y2)) > 1:
-        spline2 = make_interp_spline(x, y2, k=2)
-        y_smooth2 = spline2(x_smooth)
-        ax.plot(x_smooth, y_smooth2, color='red', alpha=0.5)
-
-    ax.set_xticks(x)
-    ax.set_xticklabels(meses, rotation=45, fontsize=10)
-    ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
-    ax.grid(True, linestyle='--', alpha=0.5)
+    # Ajustar datos para interpolar una curva suave
+    x = np.arange(len(conteos))
+    xnew = np.linspace(x.min(), x.max(), 300)
+    spl = make_interp_spline(x, conteos, k=3)
+    ynew = spl(xnew)
+    
+    # Crear etiquetas interpoladas para los meses
+    meses_interpolados = np.linspace(0, 11, 300)
+    ax.plot(meses_interpolados, ynew, label="Curva Promedio", color='blue')
+    
+    ax.set_xticks(np.arange(12))
+    ax.set_xticklabels(meses)
+    
+    ax.grid(True)
+    ax.legend()
 
     canvas = FigureCanvasTkAgg(fig, master=grafico_canvas)
     canvas.draw()
     canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
-    # Función para ajustar el tamaño del gráfico al redimensionar la ventana
     def on_resize(event):
         fig.set_size_inches(event.width / 100, event.height / 100)
         canvas.draw()
 
     grafico_ventana.bind("<Configure>", on_resize)
 
-    # Botón para guardar el gráfico dentro de la ventana del gráfico
     btn_guardar = ttk.Button(grafico_ventana, text="Guardar Gráfico", command=lambda: guardar_grafico(fig))
     btn_guardar.pack(pady=10)
 
-# Función para guardar el gráfico
 def guardar_grafico(fig):
     file_path = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG files", "*.png"), ("All files", "*.*")])
     if file_path:
         fig.savefig(file_path)
         messagebox.showinfo("Éxito", f"Gráfico guardado en {file_path}")
 
-# Función para ajustar el tamaño de los widgets al redimensionar la ventana principal
-def on_main_resize(event):
-    for widget in root.winfo_children():
-        current_font_size = max(8, int(event.width / 60))
-        widget.config(font=("Arial", current_font_size))
+def guardar_datos():
+    file_path = filedialog.asksaveasfilename(defaultextension=".json", filetypes=[("JSON files", "*.json"), ("All files", "*.*")])
+    if file_path:
+        datos = {
+            "avistamientos": avistamientos,
+            "colores": colores,
+            "plantas_avistadas": plantas_avistadas
+        }
+        with open(file_path, "w") as f:
+            json.dump(datos, f)
+        messagebox.showinfo("Éxito", f"Datos guardados en {file_path}")
 
-# Crear la ventana principal
+def cargar_datos():
+    file_path = filedialog.askopenfilename(filetypes=[("JSON files", "*.json"), ("All files", "*.*")])
+    if file_path:
+        with open(file_path, "r") as f:
+            datos = json.load(f)
+            global avistamientos, colores, plantas_avistadas
+            avistamientos = {int(k): v for k, v in datos["avistamientos"].items()}
+            colores = datos["colores"]
+            plantas_avistadas = datos["plantas_avistadas"]
+        actualizar_lista_plantas()
+        messagebox.showinfo("Éxito", "Datos cargados exitosamente")
+
+def eliminar_planta():
+    seleccionado = lista_plantas.curselection()
+    if seleccionado:
+        planta = lista_plantas.get(seleccionado[0]).split(" ")[0]
+        if planta in plantas_avistadas:
+            del plantas_avistadas[planta]
+            del colores[planta]
+            avistamientos = inicializar_avistamientos()
+            for p, datos in plantas_avistadas.items():
+                for mes in datos["meses"]:
+                    avistamientos[mes][0] += 1
+                    avistamientos[mes][1] += 1
+            actualizar_lista_plantas()
+            messagebox.showinfo("Éxito", f"Planta {planta} eliminada.")
+
+def crear_barra_menu():
+    barra_menu = tk.Menu(root)
+    root.config(menu=barra_menu)
+    
+    menu_archivo = tk.Menu(barra_menu, tearoff=0)
+    barra_menu.add_cascade(label="Archivo", menu=menu_archivo)
+    
+    menu_archivo.add_command(label="Guardar Datos", command=guardar_datos)
+    menu_archivo.add_command(label="Cargar Datos", command=cargar_datos)
+    menu_archivo.add_separator()
+    menu_archivo.add_command(label="Salir", command=root.quit)
+    
+    # Agregar el botón de ayuda a la barra de menú
+    menu_ayuda = tk.Menu(barra_menu, tearoff=0)
+    barra_menu.add_cascade(label="Ayuda", menu=menu_ayuda)
+    menu_ayuda.add_command(label="Acerca de", command=muestra_info)
+
+def muestra_info():
+    messagebox.showinfo("Ayuda", "Es una app de código abierta realizada por Juan Marcos Carrizo - Astica - Vale Fértil.\njuanmarcoscarrizo@gmail.com")
+
+def on_click_lista(event):
+    if event.widget.curselection():
+        menu_contextual.post(event.x_root, event.y_root)
+
 root = tk.Tk()
 root.title("Generador de curvas florales")
 
-# Agregar ícono de abeja
-icon_path = "abejita.ico"  # Ruta correcta al ícono de abeja
-if os.path.exists(icon_path):
-    root.iconbitmap(icon_path)
+# Crear barra de menú
+crear_barra_menu()
 
-# Estilo personalizado para la interfaz
-style = ttk.Style()
-style.configure("TButton", font=("Arial", 12), padding=6)
-style.configure("TLabel", font=("Arial", 12))
-style.configure("TEntry", font=("Arial", 12))
-
-# Crear widgets
+# Campos de entrada
 ttk.Label(root, text="Nombre de la Planta:").grid(row=0, column=0, padx=10, pady=10)
 planta_entry = ttk.Entry(root)
 planta_entry.grid(row=0, column=1, columnspan=2, padx=10, pady=10)
@@ -169,37 +208,36 @@ ttk.Label(root, text="Nombre Científico (opcional):").grid(row=1, column=0, pad
 nombre_cientifico_entry = ttk.Entry(root)
 nombre_cientifico_entry.grid(row=1, column=1, columnspan=2, padx=10, pady=10)
 
-# Etiquetas para las quincenas en la parte superior
-ttk.Label(root, text="1ra Quincena").grid(row=2, column=1, padx=5, pady=5)
-ttk.Label(root, text="2da Quincena").grid(row=2, column=2, padx=5, pady=5)
-
-# Crear los casilleros para las quincenas de cada mes
+meses_nombres = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 quincenas = []
-meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
-for i, mes in enumerate(meses):
-    tk.Label(root, text=mes).grid(row=i + 3, column=0, padx=5, pady=5, sticky="w")
-    q1 = tk.IntVar()
-    q2 = tk.IntVar()
-    quincenas.append((q1, q2))
-    tk.Checkbutton(root, variable=q1, onvalue=1, offvalue=0, width=15).grid(row=i + 3, column=1, padx=5, pady=5)
-    tk.Checkbutton(root, variable=q2, onvalue=1, offvalue=0, width=15).grid(row=i + 3, column=2, padx=5, pady=5)
 
-# Ventana para la lista de plantas avistadas
+for i, mes in enumerate(meses_nombres):
+    ttk.Label(root, text=mes).grid(row=i + 3, column=0, padx=10, pady=5)
+    quincenas.append([
+        tk.IntVar(),
+        tk.IntVar()
+    ])
+    ttk.Checkbutton(root, variable=quincenas[i][0], text="1ra Quincena").grid(row=i + 3, column=1)
+    ttk.Checkbutton(root, variable=quincenas[i][1], text="2da Quincena").grid(row=i + 3, column=2)
+
+# Botones
+ttk.Button(root, text="Agregar Ejemplar", command=agregar_avistamiento).grid(row=15, column=3, pady=10, sticky='e')
+ttk.Button(root, text="Generar Gráfico", command=mostrar_grafico).grid(row=15, column=4, pady=10, padx=10)
+
+# Lista de plantas avistadas
 lista_plantas_frame = ttk.Frame(root)
-lista_plantas_frame.grid(row=0, column=4, rowspan=12, padx=10, pady=10, sticky="ns")
+lista_plantas_frame.grid(row=0, column=5, rowspan=17, padx=10, pady=10, sticky='ns')
+lista_plantas_scroll = tk.Scrollbar(lista_plantas_frame, orient=tk.VERTICAL)
+lista_plantas_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+lista_plantas = tk.Listbox(lista_plantas_frame, yscrollcommand=lista_plantas_scroll.set, width=50)
+lista_plantas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+lista_plantas_scroll.config(command=lista_plantas.yview)
 
-lista_plantas = tk.Listbox(lista_plantas_frame, width=50, height=20)
-lista_plantas.pack(fill=tk.BOTH, expand=True)
+# Menú contextual para eliminar plantas
+menu_contextual = tk.Menu(root, tearoff=0)
+menu_contextual.add_command(label="Eliminar Planta", command=eliminar_planta)
 
-# Botón para agregar un ejemplar
-agregar_btn = ttk.Button(root, text="Agregar Ejemplar", command=agregar_avistamiento)
-agregar_btn.grid(row=14, column=4, padx=10, pady=10, sticky="ew")
-
-# Botón para generar el gráfico
-generar_btn = ttk.Button(root, text="Generar Gráfico", command=mostrar_grafico)
-generar_btn.grid(row=14, column=5, padx=10, pady=10, sticky="ew")
-
-# Configurar la redimensión de la ventana principal
-root.bind("<Configure>", on_main_resize)
+# Asociar el menú contextual con el clic derecho
+lista_plantas.bind("<Button-3>", on_click_lista)
 
 root.mainloop()
