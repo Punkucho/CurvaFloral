@@ -159,39 +159,76 @@ def eliminar_planta():
     if seleccionado:
         planta = lista_plantas.get(seleccionado[0]).split(" ")[0]
         if planta in plantas_avistadas:
+            # Eliminar la planta de avistamientos
+            for mes in plantas_avistadas[planta]["meses"]:
+                avistamientos[mes][0] -= 1
+                avistamientos[mes][1] -= 1
             del plantas_avistadas[planta]
             del colores[planta]
-            avistamientos = inicializar_avistamientos()
-            for p, datos in plantas_avistadas.items():
-                for mes in datos["meses"]:
-                    avistamientos[mes][0] += 1
-                    avistamientos[mes][1] += 1
             actualizar_lista_plantas()
             messagebox.showinfo("Éxito", f"Planta {planta} eliminada.")
+
+def editar_planta():
+    seleccionado = lista_plantas.curselection()
+    if seleccionado:
+        planta = lista_plantas.get(seleccionado[0]).split(" ")[0]
+        if planta in plantas_avistadas:
+            datos = plantas_avistadas[planta]
+            planta_entry.delete(0, tk.END)
+            planta_entry.insert(0, planta)
+            nombre_cientifico_entry.delete(0, tk.END)
+            nombre_cientifico_entry.insert(0, datos["nombre_cientifico"])
+            for mes in range(12):
+                quincenas[mes][0].set(1 if mes in datos["meses"] else 0)
+                quincenas[mes][1].set(1 if mes in datos["meses"] else 0)
+
+def guardar_ediciones():
+    planta = planta_entry.get()
+    nombre_cientifico = nombre_cientifico_entry.get()
+    seleccionado = lista_plantas.curselection()
+    if seleccionado:
+        planta_original = lista_plantas.get(seleccionado[0]).split(" ")[0]
+        if planta_original in plantas_avistadas:
+            # Eliminar planta antigua
+            for mes in plantas_avistadas[planta_original]["meses"]:
+                avistamientos[mes][0] -= 1
+                avistamientos[mes][1] -= 1
+            del plantas_avistadas[planta_original]
+
+            # Guardar los datos editados
+            if planta not in plantas_avistadas:
+                plantas_avistadas[planta] = {"nombre_cientifico": nombre_cientifico, "meses": []}
+            for mes in range(12):
+                if quincenas[mes][0].get() == 1 or quincenas[mes][1].get() == 1:
+                    if mes not in plantas_avistadas[planta]["meses"]:
+                        plantas_avistadas[planta]["meses"].append(mes)
+                        avistamientos[mes][0] += 1
+                    if quincenas[mes][0].get() == 1:
+                        avistamientos[mes][0] += 1
+                    if quincenas[mes][1].get() == 1:
+                        avistamientos[mes][1] += 1
+
+            actualizar_lista_plantas()
+            messagebox.showinfo("Éxito", f"Datos de {planta} actualizados.")
+        else:
+            messagebox.showerror("Error", "Planta no encontrada.")
 
 def crear_barra_menu():
     barra_menu = tk.Menu(root)
     root.config(menu=barra_menu)
-    
+
     menu_archivo = tk.Menu(barra_menu, tearoff=0)
     barra_menu.add_cascade(label="Archivo", menu=menu_archivo)
-    
     menu_archivo.add_command(label="Guardar Datos", command=guardar_datos)
     menu_archivo.add_command(label="Cargar Datos", command=cargar_datos)
-    menu_archivo.add_separator()
     menu_archivo.add_command(label="Salir", command=root.quit)
-    
-    # Agregar el botón de ayuda a la barra de menú
-    menu_ayuda = tk.Menu(barra_menu, tearoff=0)
-    barra_menu.add_cascade(label="Ayuda", menu=menu_ayuda)
-    menu_ayuda.add_command(label="Acerca de", command=muestra_info)
 
-def muestra_info():
-    messagebox.showinfo("Ayuda", "Es una app de código abierta realizada por Juan Marcos Carrizo - Astica - Vale Fértil.\njuanmarcoscarrizo@gmail.com")
+    menu_editar = tk.Menu(barra_menu, tearoff=0)
+    barra_menu.add_cascade(label="Editar", menu=menu_editar)
+    menu_editar.add_command(label="Editar Planta", command=editar_planta)
 
 def on_click_lista(event):
-    if event.widget.curselection():
-        menu_contextual.post(event.x_root, event.y_root)
+    menu_contextual.post(event.x_root, event.y_root)
 
 root = tk.Tk()
 root.title("Generador de curvas florales")
@@ -223,10 +260,11 @@ for i, mes in enumerate(meses_nombres):
 # Botones
 ttk.Button(root, text="Agregar Ejemplar", command=agregar_avistamiento).grid(row=15, column=3, pady=10, sticky='e')
 ttk.Button(root, text="Generar Gráfico", command=mostrar_grafico).grid(row=15, column=4, pady=10, padx=10)
+ttk.Button(root, text="Guardar Ediciones", command=guardar_ediciones).grid(row=15, column=5, pady=10, padx=10)
 
 # Lista de plantas avistadas
 lista_plantas_frame = ttk.Frame(root)
-lista_plantas_frame.grid(row=0, column=5, rowspan=17, padx=10, pady=10, sticky='ns')
+lista_plantas_frame.grid(row=0, column=6, rowspan=17, padx=10, pady=10, sticky='ns')
 lista_plantas_scroll = tk.Scrollbar(lista_plantas_frame, orient=tk.VERTICAL)
 lista_plantas_scroll.pack(side=tk.RIGHT, fill=tk.Y)
 lista_plantas = tk.Listbox(lista_plantas_frame, yscrollcommand=lista_plantas_scroll.set, width=50)
@@ -236,6 +274,7 @@ lista_plantas_scroll.config(command=lista_plantas.yview)
 # Menú contextual para eliminar plantas
 menu_contextual = tk.Menu(root, tearoff=0)
 menu_contextual.add_command(label="Eliminar Planta", command=eliminar_planta)
+menu_contextual.add_command(label="Editar Planta", command=editar_planta)
 
 # Asociar el menú contextual con el clic derecho
 lista_plantas.bind("<Button-3>", on_click_lista)
