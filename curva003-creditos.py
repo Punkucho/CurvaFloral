@@ -183,9 +183,10 @@ def mostrar_creditos():
     ventana_creditos.iconbitmap('abejita.ico')
     
     # Agregar mensaje de créditos
-    mensaje = ("Esta aplicación es de código abierto y fue realizada por Juan Marcos Carrizo "
-               "de Astica para ayudar a todos los apicultores del mundo.\n"
-               "juanmarcoscarrizo@gmail.com")
+    mensaje = ("Esta aplicación es de código abierto y fue creada por Juan Marcos Carrizo "
+            "de Astica para ayudar a todos los apicultores del mundo.\n"
+            "Dedicada a mi amigo y maestro en apicultura, Perdo Saavedra. \n"
+            "juanmarcoscarrizo@gmail.com")
     
     tk.Label(ventana_creditos, text=mensaje, padx=20, pady=20).pack()
 
